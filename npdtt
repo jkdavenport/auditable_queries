@@ -1,0 +1,39 @@
+-- Returns first 100 rows from PRODDB.PUBLIC.FACT_SALESFORCE_OPPORTUNITY
+
+/**
+Known limitations:
+- Only works if Business ID is populated on Account in SFDC. May not work for Corporate Opptys since they will have the wrong Drive Business ID on it
+
+**/
+
+SELECT
+  -- KEY INFO
+  distinct opp.id AS opportunity_id
+  , acct.business_id_customized AS doorstep_business_id
+  , acct.name AS account_name
+  , dbm.DEVELOPER_ID
+  , opp.PACT_SAFE_RECORD_CUSTOMIZED as pact_safe_link
+  , opp.non_productized_term_implementation_pla_customized as opp_non_prod_implementation -- replace with unproductized deal terms field
+  , opp.CLOSE_DATE
+FROM proddb.public.fact_salesforce_opportunity AS opp
+LEFT JOIN proddb.public.fact_salesforce_account AS acct
+  ON opp.account_id = acct.id
+LEFT JOIN drive_prod.public.maindb_accounts AS drive_acct
+  ON drive_acct.doorstep_business_id = opp.account_business_id_customized
+LEFT JOIN drive_prod.public.maindb_partnerships AS prtnr
+  ON prtnr.related_entity_id = drive_acct.id
+LEFT JOIN DRIVE_PROD.PUBLIC.MAINDB_DRIVE_BUSINESS_MAPPING dbm on dbm.BUSINESS_ID = acct.business_id_customized
+-- LEFT JOIN drive_prod.public.maindb_partnership_fee_modifier AS fee_mod
+--   ON fee_mod.partnership_id = prtnr.id
+-- LEFT JOIN drive_prod.public.maindb_promotion AS promo
+--   ON promo.entity_id = drive_acct.id
+WHERE opp.is_won
+  -- AND opp.dasher_regulatory_fee_customized != 0
+  -- AND LOWER(prtnr.order_type) = 'small_order_fulfillment'
+  AND prtnr.end_at IS NULL
+  -- AND NON_STANDARD_TERMS_CUSTOMIZED = true
+  AND non_productized_financial_terms_customized = true
+  AND (opp.record_type_name = 'DoorDash Drive' OR opp.record_type_name = 'Corporate')
+  AND opp.STAGE_NAME = 'Closed Won'
+  AND opp.id not in ('0062L00000V4J6wQAF', '0062L00000Vd5wVQAR', '0062L00000V4NWmQAN', '0062L00000VcvBHQAZ', '0062L00000UiLuWQAV', '0062L00000VMenRQAT',  '0062L00000U6qUrQAJ'::text)
+ORDER BY opp.CLOSE_DATE, acct.business_id_customized desc
